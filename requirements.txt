@@ -1,0 +1,8 @@
+build==0.10.0
+jupyter>=1.0.0
+treon>=0.1.4
+pandas>=1.5.3
+numpy>=1.24.2
+setuptools>=67.6.0
+scikit-learn>=1.2.2
+lime>=0.2.0.1
