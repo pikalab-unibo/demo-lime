@@ -1,6 +1,4 @@
-import re
 from pathlib import Path
-from typing import Callable, Iterable
 import pandas as pd
 from abc import ABCMeta
 
@@ -74,7 +72,7 @@ class Dataset(ABCMeta):
             if mcs.preprocess and preprocess:
                 return mcs.get_processed_dataset(mcs.data_test_file_name)
             else:
-                return pd.read_csv(PATH / mcs.data_file_name)
+                return pd.read_csv(PATH / mcs.data_test_file_name)
 
     @staticmethod
     def get_processed_dataset(data: str or pd.DataFrame) -> pd.DataFrame:
@@ -83,7 +81,6 @@ class Dataset(ABCMeta):
 
 class CensusIncome(Dataset):
     name: str = "census-income"
-    knowledge_file_name: str = "census-income.pl"
     preprocess: bool = True
     data_file_name: str = "census-income.csv"
     data_test_file_name: str = "census-income-test.csv"
@@ -106,11 +103,11 @@ class CensusIncome(Dataset):
         "NativeCountry",
     ]
     target: list[str] = ["income"]
-    class_mapping: dict[str, int] = {"0.0": 0, "1.0": 1}
     integer_features: list[str] = ["Age", "CapitalGain", "CapitalLoss", "HoursPerWeek"]
     ordinal_features: list[str] = ["EducationNumeric"]
     binary_features: list[str] = ["Sex"]
     nominal_features: list[str] = [
+        "Sex",
         "WorkClass",
         "MaritalStatus",
         "Occupation",
@@ -119,39 +116,3 @@ class CensusIncome(Dataset):
         "NativeCountry",
     ]
     droppable_features: list[str] = ["Fnlwgt", "Education"]
-
-    @staticmethod
-    def get_processed_dataset(data: str or pd.DataFrame) -> pd.DataFrame:
-        if isinstance(data, str):
-            data = pd.read_csv(PATH / data)
-        new_data = data.copy()
-        new_data.drop(CensusIncome.droppable_features, axis=1, inplace=True)
-        new_data.Sex = new_data.Sex.apply(
-            lambda x: 0 if x.replace(" ", "") in ("Male", "Male.") else 1
-        )
-        target = new_data.income.apply(
-            lambda x: 0 if x.replace(" ", "") in ("<=50K", "<=50K.") else 1
-        ).astype(int)
-        new_data.drop(CensusIncome.target, axis=1, inplace=True)
-        new_data.drop(CensusIncome.nominal_features, axis=1, inplace=True)
-        one_hot = pd.get_dummies(
-            data[CensusIncome.nominal_features].apply(lambda x: x.str.upper()),
-            columns=CensusIncome.nominal_features,
-        )
-        callback: Callable = lambda pat: pat.group(1) + "_" + pat.group(2).lower()
-
-        one_hot.columns = [
-            re.sub(r"([A-Z][a-zA-Z]*)[_][ ]?(.*)", callback, f) for f in one_hot.columns
-        ]
-        # Special characters removed
-        one_hot.columns = [f.replace("?", "unknown") for f in one_hot.columns]
-        one_hot.columns = [f.replace("-", "_") for f in one_hot.columns]
-        one_hot.columns = [f.replace("&", "_") for f in one_hot.columns]
-        one_hot.columns = [
-            f.replace(
-                "NativeCountry_outlying_us(guam_usvi_etc)", "NativeCountry_outlying_us"
-            )
-            for f in one_hot.columns
-        ]
-        new_data = pd.concat([new_data, one_hot, target], axis=1)
-        return new_data
