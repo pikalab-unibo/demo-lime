@@ -1,6 +1,5 @@
 FROM python:3.9
 EXPOSE 8888
-RUN apt update; apt install -y -q openjdk-17-jdk
 RUN pip install jupyter
 RUN pip install lime
 COPY requirements.txt .
