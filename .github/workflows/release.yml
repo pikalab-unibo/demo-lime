@@ -1,0 +1,67 @@
+name: release
+on:
+  workflow_run:
+    workflows:
+      - check
+    types:
+      - completed
+    branches:
+      - main
+      - master
+      - develop
+env:
+  PROJECT_NAME: demo-lime
+  WORKFLOW: release
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    name: Create release
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0 # all history
+
+      - name: Get All Tags
+        run: git fetch --tags -f
+
+      - name: Get Python Version
+        id: get-python-version
+        run: echo "version=$(cat .python-version)" >> $GITHUB_OUTPUT
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ steps.get-python-version.outputs.version }}
+
+      - name: Restore Python dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Pack
+        run: python -m build
+
+      - name: Archive Dist Artifacts
+        if: failure() || success()
+        uses: actions/upload-artifact@v3
+        with:
+          name: dist
+          path: './dist'
+
+      - name: Get Version
+        id: get-version
+        run: echo "version=$(python setup.py get_project_version | tail -n 1)" >> $GITHUB_OUTPUT
+
+      - name: Release Assets
+        id: upload-release-assets
+        run: |
+          set -x
+          ASSETS=()
+          for A in dist/*; do
+            ASSETS+=("-a" "$A")
+            echo "Releasing $A"
+          done
+          RELEASE_TAG='${{ steps.get-version.outputs.version }}'
+          hub release create "${ASSETS[@]}" -m "$RELEASE_TAG" "$RELEASE_TAG"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
